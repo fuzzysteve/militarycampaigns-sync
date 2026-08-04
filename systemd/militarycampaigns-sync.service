@@ -1,0 +1,9 @@
+[Unit]
+Description=Sync EVE military campaign objective status from ESI
+After=network-online.target mysql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/scripts/militarycampaigns
+ExecStart=/home/scripts/militarycampaigns/.venv/bin/python3 /home/scripts/militarycampaigns/run.py
