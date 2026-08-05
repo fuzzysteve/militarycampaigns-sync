@@ -43,6 +43,11 @@ milCampaignObjectiveStatus = Table(
     Column('finished', DateTime()),
     Column('lastModified', DateTime()),
 )
+milCampaignSyncCursor = Table(
+    'milCampaignSyncCursor', status_metadata,
+    Column('campaignID', VARCHAR(length=36), primary_key=True),
+    Column('afterCursor', VARCHAR(length=255), nullable=False),
+)
 
 
 def esi_get(url):
@@ -60,14 +65,30 @@ def to_datetime(iso_string):
     return datetime.fromisoformat(iso_string.replace('Z', '+00:00'))
 
 
+def get_stored_cursor(connection, campaign_id):
+    stmt = select(milCampaignSyncCursor.c.afterCursor).where(
+        milCampaignSyncCursor.c.campaignID == campaign_id
+    )
+    return connection.execute(stmt).scalar_one_or_none()
+
+
+def store_cursor(connection, campaign_id, after_cursor):
+    stmt = mysql_insert(milCampaignSyncCursor).values(
+        campaignID=campaign_id,
+        afterCursor=after_cursor,
+    )
+    stmt = stmt.on_duplicate_key_update(afterCursor=stmt.inserted.afterCursor)
+    connection.execute(stmt)
+    connection.commit()
+
+
 def sync_campaign_objectives(connection, campaign_id):
-    after = None
+    after = get_stored_cursor(connection, campaign_id) or '0'
+    last_after = after
     count = 0
 
     while True:
-        url = f'https://esi.evetech.net/military-campaigns/{campaign_id}/objectives?limit={ESI_LIMIT}'
-        if after is not None:
-            url += f'&after={after}'
+        url = f'https://esi.evetech.net/military-campaigns/{campaign_id}/objectives?limit={ESI_LIMIT}&after={after}'
         data = esi_get(url)
 
         objectives = data.get('objectives', [])
@@ -100,10 +121,15 @@ def sync_campaign_objectives(connection, campaign_id):
             count += 1
         connection.commit()
 
-        after = data.get('cursor', {}).get('after')
-        if len(objectives) != ESI_LIMIT or after is None:
-            break
+        next_after = data.get('cursor', {}).get('after')
+        if next_after is not None:
+            last_after = next_after
 
+        if len(objectives) != ESI_LIMIT or next_after is None:
+            break
+        after = next_after
+
+    store_cursor(connection, campaign_id, last_after)
     return count
 
 

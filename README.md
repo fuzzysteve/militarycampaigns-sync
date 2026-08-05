@@ -36,6 +36,26 @@ or, using the synced virtualenv directly:
 .venv/bin/python3 run.py
 ```
 
+## Cursor pagination
+
+The objectives endpoint takes `after`/`before` cursors, and they don't behave
+symmetrically:
+
+- Omitting `after` (or passing a non-zero value that isn't a real prior
+  cursor) starts you at the *end* of the feed, and you'd have to page
+  backwards with `before` to walk the rest of it.
+- Passing `after=0` starts you at the *beginning* of the feed, and you page
+  forwards with each response's `cursor.after`.
+- Passing a real `after` value returned from a previous run gets you only
+  objectives updated since that point — i.e. it doubles as a "what's changed
+  since last sync" cursor, not just a pagination offset.
+
+So the sync does a full forward walk from `after=0` on the very first run
+for a campaign, then persists the `after` cursor from the last (incomplete)
+page it saw into `milCampaignSyncCursor`. Every subsequent run resumes from
+that stored cursor, so it only pulls objectives that changed since the last
+sync instead of re-walking the whole feed every hour.
+
 ## Running on a schedule
 
 Unit files in [`systemd/`](systemd/) run the sync hourly at :45 past the
