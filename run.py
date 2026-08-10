@@ -14,6 +14,7 @@ from sqlalchemy import (
     DateTime,
     MetaData,
     Table,
+    Uuid,
     create_engine,
     select,
 )
@@ -26,14 +27,14 @@ ESI_LIMIT = 90
 eve_metadata = MetaData()
 milCampaigns = Table(
     'milCampaigns', eve_metadata,
-    Column('campaignID', VARCHAR(length=36), primary_key=True),
+    Column('campaignID', Uuid(as_uuid=False), primary_key=True),
 )
 
 status_metadata = MetaData()
 milCampaignObjectiveStatus = Table(
     'milCampaignObjectiveStatus', status_metadata,
-    Column('objectiveID', VARCHAR(length=36), primary_key=True),
-    Column('campaignID', VARCHAR(length=36), nullable=False),
+    Column('objectiveID', Uuid(as_uuid=False), primary_key=True),
+    Column('campaignID', Uuid(as_uuid=False), nullable=False),
     Column('state', VARCHAR(length=20), nullable=False),
     Column('progress', BIGINT(), nullable=False),
     Column('participantsTotal', INTEGER()),
@@ -45,7 +46,7 @@ milCampaignObjectiveStatus = Table(
 )
 milCampaignSyncCursor = Table(
     'milCampaignSyncCursor', status_metadata,
-    Column('campaignID', VARCHAR(length=36), primary_key=True),
+    Column('campaignID', Uuid(as_uuid=False), primary_key=True),
     Column('afterCursor', VARCHAR(length=255), nullable=False),
 )
 
