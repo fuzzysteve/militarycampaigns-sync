@@ -1,9 +1,13 @@
 # militarycampaigns-sync
 
-Single-script sync job: reads campaign IDs from the `eve.milCampaigns` table,
-fetches each campaign's objectives from ESI
-(`/military-campaigns/{campaign_id}/objectives`), and upserts them into
-`militarycampaigns.milCampaignObjectiveStatus`. Entry point is `run.py`,
+Single-script sync job. Each run first fetches the campaign list from ESI
+(`/military-campaigns`: state, progress, started, finished) and upserts it into
+`militarycampaigns.milCampaignStatus` (`sync_campaigns()`), then reads campaign
+IDs from the `eve.milCampaigns` table, fetches each campaign's objectives from
+ESI (`/military-campaigns/{campaign_id}/objectives`), and upserts them into
+`militarycampaigns.milCampaignObjectiveStatus`. A failure in either step is
+logged and doesn't stop the rest of the run. The tables are not created by
+this script; they were created by hand in the `militarycampaigns` database. Entry point is `run.py`,
 run via `uv run run.py`.
 
 - DB connection strings live in `config.py`, which is gitignored — copy

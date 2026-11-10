@@ -1,5 +1,6 @@
-"""Pulls current state/progress for every military campaign objective from ESI
-and upserts it into militarycampaigns.milCampaignObjectiveStatus.
+"""Pulls current state/progress for every military campaign from ESI into
+militarycampaigns.milCampaignStatus, and for every campaign objective into
+militarycampaigns.milCampaignObjectiveStatus.
 """
 
 import sys
@@ -43,6 +44,14 @@ milCampaignObjectiveStatus = Table(
     Column('started', DateTime()),
     Column('finished', DateTime()),
     Column('lastModified', DateTime()),
+)
+milCampaignStatus = Table(
+    'milCampaignStatus', status_metadata,
+    Column('campaignID', Uuid(as_uuid=False), primary_key=True),
+    Column('state', VARCHAR(length=20), nullable=False),
+    Column('progress', BIGINT(), nullable=False),
+    Column('started', DateTime()),
+    Column('finished', DateTime()),
 )
 milCampaignSyncCursor = Table(
     'milCampaignSyncCursor', status_metadata,
@@ -134,6 +143,30 @@ def sync_campaign_objectives(connection, campaign_id):
     return count
 
 
+def sync_campaigns(connection):
+    """Upserts every campaign from GET /military-campaigns (state, progress,
+    started, finished). Unpaginated; returns the number of campaigns."""
+    data = esi_get('https://esi.evetech.net/military-campaigns')
+    campaigns = data.get('campaigns', [])
+    with connection.begin():
+        for campaign in campaigns:
+            stmt = mysql_insert(milCampaignStatus).values(
+                campaignID=campaign['id'],
+                state=campaign['state'],
+                progress=campaign['progress'],
+                started=to_datetime(campaign.get('started')),
+                finished=to_datetime(campaign.get('finished')),
+            )
+            stmt = stmt.on_duplicate_key_update(
+                state=stmt.inserted.state,
+                progress=stmt.inserted.progress,
+                started=stmt.inserted.started,
+                finished=stmt.inserted.finished,
+            )
+            connection.execute(stmt)
+    return len(campaigns)
+
+
 def main():
     eve_engine = create_engine(EVE_DB_URL)
     status_engine = create_engine(STATUS_DB_URL)
@@ -142,6 +175,12 @@ def main():
         campaign_ids = eve_connection.execute(select(milCampaigns.c.campaignID)).scalars().all()
 
     with status_engine.connect() as status_connection:
+        try:
+            count = sync_campaigns(status_connection)
+            print(f'campaigns: {count} synced')
+        except Exception as e:
+            print(f'campaigns: FAILED - {e}', file=sys.stderr)
+
         for campaign_id in campaign_ids:
             try:
                 count = sync_campaign_objectives(status_connection, campaign_id)
