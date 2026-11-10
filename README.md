@@ -1,8 +1,9 @@
 # militarycampaigns-sync
 
-Pulls current state/progress for every military campaign objective from EVE
-Online's ESI API and upserts it into the `militarycampaigns.milCampaignObjectiveStatus`
-table.
+Pulls current state/progress for every military campaign, and every campaign
+objective, from EVE Online's ESI API and upserts them into the
+`militarycampaigns.milCampaignStatus` and
+`militarycampaigns.milCampaignObjectiveStatus` tables.
 
 ## Requirements
 
@@ -11,14 +12,20 @@ table.
 - MySQL databases:
   - `eve` — must already contain a populated `milCampaigns` table (list of
     campaign IDs to sync)
-  - `militarycampaigns` — destination for `milCampaignObjectiveStatus`
+  - `militarycampaigns` — destination for `milCampaignStatus`,
+    `milCampaignObjectiveStatus` and `milCampaignSyncCursor` (created from
+    [`schema.sql`](schema.sql))
 
 ## Setup
 
 ```bash
 uv sync
 cp config.example.py config.py
+mysql militarycampaigns < schema.sql
 ```
+
+`run.py` doesn't create its tables. `schema.sql` uses `CREATE TABLE IF NOT
+EXISTS`, so it's safe to re-run.
 
 Edit `config.py` with your real `EVE_DB_URL` / `STATUS_DB_URL` connection
 strings. `config.py` is gitignored since it holds credentials — never commit
